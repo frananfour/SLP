@@ -1,7 +1,7 @@
 import sqlite3
 import requests
 
-# Шаг 1. Создание базы данных и таблицы
+#создаю бд
 conn = sqlite3.connect('database.db')
 cursor = conn.cursor()
 cursor.execute('''
@@ -15,12 +15,12 @@ CREATE TABLE IF NOT EXISTS posts (
 conn.commit()
 conn.close()
 
-# Шаг 2. Получение данных с сервера
+# получ лданные
 url = 'https://jsonplaceholder.typicode.com/posts'
 response = requests.get(url)
 posts_data = response.json()
 
-# Шаг 3. Сохранение данных в базу данных
+# сохраняю данные в бд
 conn = sqlite3.connect('database.db')
 cursor = conn.cursor()
 for post in posts_data:
@@ -31,7 +31,7 @@ for post in posts_data:
 conn.commit()
 conn.close()
 
-# Шаг 4. Чтение данных из базы по user_id
+# Чтение данных из базы по user_id
 def get_posts_by_user(user_id):
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
@@ -40,7 +40,7 @@ def get_posts_by_user(user_id):
     conn.close()
     return posts
 
-# Тестируем чтение данных для пользователя с user_id = 1
+# тест
 user_posts = get_posts_by_user(1)
 for post in user_posts:
     print(post)
