@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtSql import QSqlDatabase, QSqlTableModel
 import sqlite3
 
-# Класс главного окна
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
