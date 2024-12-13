@@ -5,6 +5,7 @@ import aiosqlite
 from PyQt5.QtWidgets import QApplication, QPushButton, QLabel, QVBoxLayout, QProgressBar, QWidget
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 
+
 # Класс потока для выполнения HTTP-запросов
 class DataLoader(QThread):
     data_loaded = pyqtSignal(list)  # Сигнал для передачи загруженных данных
@@ -15,10 +16,12 @@ class DataLoader(QThread):
         loop.run_until_complete(self.fetch_data())
 
     async def fetch_data(self):
+        await asyncio.sleep(1)  # Имитация задержки
         async with aiohttp.ClientSession() as session:
             async with session.get("https://jsonplaceholder.typicode.com/posts") as response:
                 data = await response.json()
-                self.data_loaded.emit(data)  # Передаем данные в основной поток через сигнал
+                self.data_loaded.emit(data)
+
 
 # Класс потока для асинхронного сохранения данных в SQLite
 class DataSaver(QThread):
@@ -34,12 +37,16 @@ class DataSaver(QThread):
         loop.run_until_complete(self.save_data())
 
     async def save_data(self):
+        await asyncio.sleep(1)  # Имитация задержки
         async with aiosqlite.connect("database.db") as db:
             await db.execute("CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT)")
-            await db.executemany("INSERT INTO posts (id, title) VALUES (?, ?)", 
-                                 [(item['id'], item['title']) for item in self.data if 'id' in item and 'title' in item])
+            await db.executemany(
+                "INSERT OR IGNORE INTO posts (id, title) VALUES (?, ?)",
+                [(item['id'], item['title']) for item in self.data if 'id' in item and 'title' in item]
+            )
             await db.commit()
-            self.data_saved.emit()  # Передаем сигнал об успешном сохранении данных
+            self.data_saved.emit()
+
 
 # Основной класс приложения PyQt5
 class MainWindow(QWidget):
@@ -47,12 +54,12 @@ class MainWindow(QWidget):
         super().__init__()
         self.setWindowTitle("Асинхронная загрузка данных")
         
-        # Настройка элементов интерфейса
+        # Настройка интерфейса
         self.layout = QVBoxLayout()
 
         # Кнопка для загрузки данных
         self.load_button = QPushButton("Загрузить данные")
-        self.load_button.clicked.connect(self.load_data)  # Подключаем к функции load_data
+        self.load_button.clicked.connect(self.load_data)
         self.layout.addWidget(self.load_button)
 
         # Индикатор выполнения
@@ -60,44 +67,43 @@ class MainWindow(QWidget):
         self.progress.setAlignment(Qt.AlignCenter)
         self.layout.addWidget(self.progress)
 
-        # Метка для отображения статуса
+        # Метка статуса
         self.status_label = QLabel("Ожидание загрузки данных...")
         self.layout.addWidget(self.status_label)
 
         self.setLayout(self.layout)
 
-        # Создаем таймер для проверки обновлений
+        # Таймер для периодической загрузки данных
         self.timer = QTimer()
         self.timer.timeout.connect(self.load_data)
-        self.timer.start(10000)  # Обновление каждые 10 секунд
+        self.timer.start(10000)
 
-    # Функция для запуска загрузки данных в отдельном потоке
     def load_data(self):
-        self.progress.setValue(0)  # Обнуляем индикатор выполнения
+        self.progress.setValue(0)
         self.status_label.setText("Загрузка данных...")
-        
-        # Запускаем DataLoader
+
+        # Создаем и запускаем DataLoader
         self.loader = DataLoader()
-        self.loader.data_loaded.connect(self.on_data_loaded)  # Подключаем к функции обработки данных
+        self.loader.data_loaded.connect(self.on_data_loaded)
         self.loader.start()
 
-    # Обработка данных после загрузки
     def on_data_loaded(self, data):
         self.status_label.setText("Сохранение данных...")
-        self.progress.setValue(50)  # Обновляем индикатор выполнения
+        self.progress.setValue(50)
 
-        # Запускаем DataSaver
+        # Создаем и запускаем DataSaver
         self.saver = DataSaver(data)
-        self.saver.data_saved.connect(self.on_data_saved)  # Подключаем к функции обработки завершения сохранения
+        self.saver.data_saved.connect(self.on_data_saved)
         self.saver.start()
 
-    # Обновление интерфейса после успешного сохранения данных
     def on_data_saved(self):
-        self.status_label.setText("Данные успешно сохранены в базу данных")
-        self.progress.setValue(100)  # Устанавливаем индикатор выполнения на 100
+        self.status_label.setText("Данные успешно сохранены!")
+        self.progress.setValue(100)
+
 
 # Запуск приложения
-app = QApplication(sys.argv)
-window = MainWindow()
-window.show()
-sys.exit(app.exec_())
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())
