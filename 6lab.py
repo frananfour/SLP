@@ -45,6 +45,8 @@ class DataAnalyzerApp(QMainWindow):
         
         # Поле для добавления данных
         self.add_data_layout = QHBoxLayout()
+        self.column_select_combo = QComboBox()
+        self.add_data_layout.addWidget(self.column_select_combo)
         self.add_value_input = QLineEdit()
         self.add_value_input.setPlaceholderText("Введите значение для добавления")
         self.add_data_layout.addWidget(self.add_value_input)
@@ -60,11 +62,12 @@ class DataAnalyzerApp(QMainWindow):
     
     def load_data(self):
         # Загрузка CSV
-        file_path, _ = QFileDialog.getOpenFileName(self, "sample_data.csv", "", "CSV Files (*.csv)")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Выберите CSV файл", "", "CSV Files (*.csv)")
         if file_path:
             try:
                 self.data = pd.read_csv(file_path)
                 self.update_statistics()
+                self.update_column_selector()
                 QMessageBox.information(self, "Успех", "Данные успешно загружены!")
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить данные: {e}")
@@ -78,6 +81,12 @@ class DataAnalyzerApp(QMainWindow):
                 stats_text += f"{col}: {self.data[col].dtype}\n"
             self.stats_label.setText(stats_text)
     
+    def update_column_selector(self):
+        # Обновление выбора столбцов
+        if self.data is not None:
+            self.column_select_combo.clear()
+            self.column_select_combo.addItems(self.data.columns)
+    
     def plot_graph(self):
         if self.data is None:
             QMessageBox.warning(self, "Предупреждение", "Сначала загрузите данные!")
@@ -88,20 +97,21 @@ class DataAnalyzerApp(QMainWindow):
         ax = self.figure.add_subplot(111)
         
         if graph_type == "Линейный график":
-            if "Date" in self.data.columns and "Value1" in self.data.columns:
-                self.data.plot(x="Date", y="Value1", ax=ax)
+            if len(self.data.columns) >= 2:
+                self.data.plot(ax=ax)
             else:
-                QMessageBox.warning(self, "Ошибка", "Нет данных для построения линейного графика.")
+                QMessageBox.warning(self, "Ошибка", "Недостаточно данных для линейного графика.")
         elif graph_type == "Гистограмма":
-            if "Date" in self.data.columns and "Value2" in self.data.columns:
-                sns.barplot(data=self.data, x="Date", y="Value2", ax=ax)
+            column = self.column_select_combo.currentText()
+            if column:
+                sns.histplot(data=self.data, x=column, ax=ax, kde=True)
             else:
-                QMessageBox.warning(self, "Ошибка", "Нет данных для построения гистограммы.")
+                QMessageBox.warning(self, "Ошибка", "Выберите столбец для гистограммы.")
         elif graph_type == "Круговая диаграмма":
             if "Category" in self.data.columns:
                 self.data["Category"].value_counts().plot.pie(ax=ax, autopct="%1.1f%%")
             else:
-                QMessageBox.warning(self, "Ошибка", "Нет данных для построения круговой диаграммы.")
+                QMessageBox.warning(self, "Ошибка", "Нет данных для круговой диаграммы.")
         
         self.canvas.draw()
     
@@ -110,15 +120,21 @@ class DataAnalyzerApp(QMainWindow):
             QMessageBox.warning(self, "Предупреждение", "Сначала загрузите данные!")
             return
         
+        column = self.column_select_combo.currentText()
         value = self.add_value_input.text()
-        if value:
+        if column and value:
             try:
-                new_row = pd.DataFrame([[value]], columns=[self.data.columns[0]])
+                if self.data[column].dtype in [int, float]:
+                    value = float(value)
+                new_row = pd.DataFrame({column: [value]})
                 self.data = pd.concat([self.data, new_row], ignore_index=True)
                 self.update_statistics()
+                self.plot_graph()  # Обновляем график
                 QMessageBox.information(self, "Успех", "Значение успешно добавлено!")
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Не удалось добавить значение: {e}")
+        else:
+            QMessageBox.warning(self, "Ошибка", "Введите значение и выберите столбец.")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
